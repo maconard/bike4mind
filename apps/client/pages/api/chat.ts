@@ -65,7 +65,12 @@ const handler = baseApi({ requiredScopes: [ApiKeyScope.AI_CHAT, ApiKeyScope.AI_G
     // `getSettingsValue` already returns the schema default (Bedrock Claude) when unset; the
     // `||` is defense-in-depth and must match that default so a future refactor can't silently
     // re-introduce the key-requiring Anthropic-hosted variant here.
-    const defaultModel = getSettingsValue('DefaultAPIModel', settings) || ChatModels.CLAUDE_5_SONNET_BEDROCK;
+    let defaultModel = getSettingsValue('DefaultAPIModel', settings) || ChatModels.CLAUDE_5_SONNET_BEDROCK;
+    // Self-host has no Bedrock, so the schema-default model above can only fail
+    // there; substitute the direct-API equivalent (backed by the env/user key).
+    if (process.env.B4M_SELF_HOST === 'true' && defaultModel === ChatModels.CLAUDE_5_SONNET_BEDROCK) {
+      defaultModel = ChatModels.CLAUDE_5_SONNET;
+    }
 
     const simplifiedRequest = SimplifiedChatRequestSchema.parse(req.body);
 

@@ -69,6 +69,7 @@ describe('MailService', () => {
         host: 'smtp.example.com',
         auth: { user: 'user@example.com', pass: 'secret' },
         secure: true,
+        requireTLS: false,
       });
     });
   });

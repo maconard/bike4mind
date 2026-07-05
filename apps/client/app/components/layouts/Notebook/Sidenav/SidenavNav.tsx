@@ -12,6 +12,7 @@ import WaterOutlinedIcon from '@mui/icons-material/WaterOutlined';
 import CastleOutlinedIcon from '@mui/icons-material/CastleOutlined';
 import HelpCenterOutlinedIcon from '@mui/icons-material/HelpCenterOutlined';
 import { canAccessTavern } from '@bike4mind/common';
+import { premiumRoutes } from '@client/app/premium-generated/premiumRoutes.generated';
 import { useFeatureEnabled } from '@client/app/hooks/useFeatureEnabled';
 import { useAdminSettingsCache } from '@client/app/hooks/useAdminSettingsCache';
 import { useUser } from '@client/app/contexts/UserContext';
@@ -57,7 +58,10 @@ const SidenavNav = ({ section = 'all' }: { section?: 'pinned' | 'scroll' | 'all'
   // Visibility rides purely on product access (tag/entitlement); the legacy
   // experimental toggle was retired with the open-core carve.
   const isOptiEnabled = hasOptiAccess;
-  const isTavernEnabled = canAccessTavern(currentUser);
+  // /tavern is a codegen-mounted premium route; builds without the overlay
+  // (open core) have no such route, so the entry must hide or it dead-ends.
+  const tavernRouteExists = premiumRoutes.some(route => route.path.startsWith('/tavern'));
+  const isTavernEnabled = tavernRouteExists && canAccessTavern(currentUser);
   // The server gates every /api/data-lakes endpoint on the EnableDataLakes admin setting,
   // so hide the Data Lakes destination when it's off - otherwise the link lands on an
   // Explorer whose every request 403s (mirrors FileBrowser's guard).

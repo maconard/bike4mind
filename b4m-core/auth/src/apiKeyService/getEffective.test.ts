@@ -181,4 +181,79 @@ describe('getEffectiveLLMApiKeys', () => {
     const [, , options] = getSettingsByNames.mock.calls[0];
     expect(options?.logger).toBe(logger);
   });
+
+  describe('self-host env-key fallback', () => {
+    const withEnv = async (env: Record<string, string | undefined>, fn: () => Promise<void>) => {
+      const saved = Object.fromEntries(Object.keys(env).map(k => [k, process.env[k]]));
+      Object.entries(env).forEach(([k, v]) => (v === undefined ? delete process.env[k] : (process.env[k] = v)));
+      try {
+        await fn();
+      } finally {
+        Object.entries(saved).forEach(([k, v]) => (v === undefined ? delete process.env[k] : (process.env[k] = v)));
+      }
+    };
+
+    it('falls back to .env provider keys under B4M_SELF_HOST when user and demo keys are absent', async () => {
+      await withEnv(
+        {
+          B4M_SELF_HOST: 'true',
+          ANTHROPIC_API_KEY: 'sk-ant-env',
+          GEMINI_API_KEY: 'gm-env',
+          OPENAI_API_KEY: 'sk-oai-env',
+          XAI_API_KEY: 'xai-env',
+        },
+        async () => {
+          const result = await getEffectiveLLMApiKeys(null, {
+            db: { apiKeys: makeApiKeyRepo(), adminSettings: makeAdminSettingsRepo() },
+            getSettingsByNames: makeGetSettingsByNames(),
+          });
+
+          expect(result.anthropic).toBe('sk-ant-env');
+          expect(result.gemini).toBe('gm-env');
+          expect(result.openai).toBe('sk-oai-env');
+          expect(result.xai).toBe('xai-env');
+          // Only the documented .env.selfhost provider keys get the fallback.
+          expect(result.bfl).toBeNull();
+          expect(result.voyageai).toBeNull();
+        }
+      );
+    });
+
+    it('ignores the env keys outside self-host (hosted resolution is unchanged)', async () => {
+      await withEnv(
+        { B4M_SELF_HOST: undefined, ANTHROPIC_API_KEY: 'sk-ant-env', GEMINI_API_KEY: 'gm-env' },
+        async () => {
+          const result = await getEffectiveLLMApiKeys(null, {
+            db: { apiKeys: makeApiKeyRepo(), adminSettings: makeAdminSettingsRepo() },
+            getSettingsByNames: makeGetSettingsByNames(),
+          });
+
+          expect(result.anthropic).toBeNull();
+          expect(result.gemini).toBeNull();
+        }
+      );
+    });
+
+    it('keeps demo-key precedence over the env fallback in self-host', async () => {
+      await withEnv({ B4M_SELF_HOST: 'true', ANTHROPIC_API_KEY: 'sk-ant-env' }, async () => {
+        const result = await getEffectiveLLMApiKeys(null, {
+          db: { apiKeys: makeApiKeyRepo(), adminSettings: makeAdminSettingsRepo() },
+          getSettingsByNames: makeGetSettingsByNames({ anthropicDemoKey: 'sk-ant-demo' }),
+        });
+
+        expect(result.anthropic).toBe('sk-ant-demo');
+      });
+    });
+
+    it('treats a blank env key as disabled (whitespace does not enable a provider)', async () => {
+      await withEnv({ B4M_SELF_HOST: 'true', ANTHROPIC_API_KEY: '   ' }, async () => {
+        const result = await getEffectiveLLMApiKeys(null, {
+          db: { apiKeys: makeApiKeyRepo(), adminSettings: makeAdminSettingsRepo() },
+          getSettingsByNames: makeGetSettingsByNames(),
+        });
+
+        expect(result.anthropic).toBeNull();
+      });
+    });
+  });
 });

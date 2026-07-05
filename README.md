@@ -44,14 +44,14 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md#the-openclosed-boundary) for the exact o
 
 ```bash
 # 1. Copy the env template, then generate JWT_SECRET / SESSION_SECRET /
-#    SECRET_ENCRYPTION_KEY (see SELF_HOST.md §2) and add your model keys
-cp .env.selfhost.example .env
+#    SECRET_ENCRYPTION_KEY (see SELF_HOST.md) and add your model keys
+cp .env.selfhost.example .env.selfhost
 
-# 2. Bring up the stack (app + MongoDB today; object storage + queues as they land)
-docker compose up
+# 2. Bring up the stack (app + MongoDB + object storage + queues + mail catcher)
+docker compose -f compose.selfhost.yaml --env-file .env.selfhost up -d
 ```
 
-Bike4Mind then runs at `http://localhost:3000`. The self-host image is published to `ghcr.io/bike4mind/bike4mind-selfhost`.
+Bike4Mind then runs at `http://localhost:3000`; sign-in code emails land in the bundled Mailpit at `http://localhost:8025`. The self-host image is published to `ghcr.io/bike4mind/bike4mind-selfhost`.
 
 ## Develop
 

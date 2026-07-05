@@ -1,5 +1,5 @@
 import { settingsMap } from '@bike4mind/common';
-import { adminSettingsRepository } from '@bike4mind/database';
+import { adminSettingsRepository, userRepository } from '@bike4mind/database';
 import { asyncHandler } from '@server/middlewares/asyncHandler';
 import { baseApi } from '@server/middlewares/baseApi';
 
@@ -21,7 +21,14 @@ const handler = baseApi({ auth: false }).get(
     // all resolve correctly (raw `=== 'true'` would silently miss boolean-stored values).
     const setting = await adminSettingsRepository.findBySettingName('allowOpenRegistration').catch(() => null);
     const parsed = settingsMap.allowOpenRegistration.schema.safeParse(setting?.settingValue);
-    const allowOpenRegistration = parsed.success ? parsed.data : false;
+    let allowOpenRegistration = parsed.success ? parsed.data : false;
+
+    // Self-host bootstrap: a fresh install (no users yet) accepts its first
+    // registration without an invite, so report registration as open. This
+    // mirrors the gate in the OTC verify route and flips back once a user exists.
+    if (!allowOpenRegistration && process.env.B4M_SELF_HOST === 'true') {
+      allowOpenRegistration = (await userRepository.count({})) === 0;
+    }
 
     const config: ServerConfigPublic = {
       // In dev, derive from request host so the URL matches the actual port

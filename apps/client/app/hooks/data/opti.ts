@@ -1,6 +1,11 @@
 import { useUser } from '@client/app/contexts/UserContext';
 import { userIsDeveloper } from '@client/app/utils/user';
+import { premiumRoutes } from '@client/app/premium-generated/premiumRoutes.generated';
 import { useEntitlements } from './entitlements';
+
+// Builds without the OptiHashi overlay (open core) have no /opti route at all;
+// every Opti surface must hide regardless of role or the entry dead-ends.
+const optiRouteExists = premiumRoutes.some(route => route.path.startsWith('/opti'));
 
 /**
  * Client-side OptiHashi access predicate - the single source of truth for
@@ -34,7 +39,8 @@ export function useOptiAccess(): boolean {
     // trim()+toLowerCase() mirrors the registry's `normalizeTag`, so a stray-whitespace
     // tag still takes the synchronous fast path instead of forcing an entitlement fetch.
     (currentUser?.tags ?? []).some(tag => tag.trim().toLowerCase() === 'opti');
-  const { data: entitlements } = useEntitlements({ enabled: !syncGranted });
+  const { data: entitlements } = useEntitlements({ enabled: optiRouteExists && !syncGranted });
+  if (!optiRouteExists) return false;
   if (syncGranted) return true;
   return (entitlements ?? []).includes('optihashi:pro');
 }

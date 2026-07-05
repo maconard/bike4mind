@@ -1492,8 +1492,11 @@ export const settingsMap = {
     // which 401s where no key is configured. A reliable, tool-calling default also fixes the
     // tool-driven surfaces (OptiHashi et al.) that silently break on GPT-5 (internal tracking).
     // Opus/Fable remain an explicit opt-in.
+    // Self-host inverts the reasoning: there is no AWS IAM there (Bedrock can never work),
+    // while ANTHROPIC_API_KEY from .env.selfhost powers the Anthropic-hosted twin.
     // This is the authoritative default returned by getSettingsValue() when no AdminSettings override exists.
-    defaultValue: ChatModels.CLAUDE_5_SONNET_BEDROCK,
+    defaultValue:
+      process.env.B4M_SELF_HOST === 'true' ? ChatModels.CLAUDE_5_SONNET : ChatModels.CLAUDE_5_SONNET_BEDROCK,
     description: 'The default AI model to use for API requests when no model is specified.',
     options: CHAT_MODELS,
     category: 'AI',
@@ -2202,7 +2205,11 @@ export const settingsMap = {
   enforceCredits: makeBooleanSetting({
     key: 'enforceCredits',
     name: 'Enforce Credits',
-    defaultValue: true,
+    // Self-host runs on the operator's own LLM keys with no billing stack (Stripe is
+    // not part of the open core), so metering defaults OFF there; hosted stays ON.
+    // B4M_SELF_HOST reaches the browser bundle via next.config's `env` inlining, so
+    // client and server resolve the same default.
+    defaultValue: process.env.B4M_SELF_HOST === 'true' ? false : true,
     description: 'Whether to enforce credits for users',
     group: API_SERVICE_GROUPS.CREDITS.id,
     category: 'Users',

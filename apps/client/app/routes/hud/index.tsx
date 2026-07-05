@@ -3,6 +3,11 @@ import { Box, Tab, TabList, TabPanel, Tabs } from '@mui/joy';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import HudDashboard from '@client/app/components/hud/HudDashboard';
 import { useDocumentTitle } from '@client/app/hooks/useDocumentTitle';
+import { premiumRoutes } from '@client/app/premium-generated/premiumRoutes.generated';
+
+// /tavern is a codegen-mounted premium route; builds without the overlay
+// (open core) have no such route, so the legacy deep-link must not redirect there.
+const tavernRouteExists = premiumRoutes.some(route => route.path.startsWith('/tavern'));
 
 const TABS = ['keep'] as const;
 type TabValue = (typeof TABS)[number];
@@ -19,15 +24,17 @@ export default function HudPage() {
   // Must run before the hasInvalidTab normalization below so the redirect fires
   // instead of being swallowed by the ?tab=keep rewrite.
   useEffect(() => {
-    if (search.tab === 'tavern') {
+    if (search.tab === 'tavern' && tavernRouteExists) {
       void navigate({ to: '/tavern', replace: true } as never);
     }
   }, [search.tab, navigate]);
 
   const requestedTab: TabValue = isValidTab(search.tab) ? search.tab : 'keep';
 
-  // Normalize an invalid ?tab= so the URL matches the rendered tab.
-  const hasInvalidTab = search.tab !== undefined && !isValidTab(search.tab) && search.tab !== 'tavern';
+  // Normalize an invalid ?tab= so the URL matches the rendered tab. Without the
+  // overlay, ?tab=tavern is just another invalid tab and normalizes away.
+  const hasInvalidTab =
+    search.tab !== undefined && !isValidTab(search.tab) && (search.tab !== 'tavern' || !tavernRouteExists);
   useEffect(() => {
     if (hasInvalidTab) {
       void navigate({ to: '/hud', search: { tab: requestedTab }, replace: true } as never);

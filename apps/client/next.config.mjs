@@ -14,6 +14,17 @@ const monorepoRoot = new URL('../../', import.meta.url).pathname;
 // B4M_SELF_HOST so the normal SST build (staging/prod) is completely unaffected.
 const selfHostResolveAlias = process.env.B4M_SELF_HOST === 'true' ? { sst: '@bike4mind/resource' } : {};
 
+// The self-host quest runner statically imports the whole quest-processing
+// chain. Hosted builds alias it to a stub so that chain never enters the Next
+// server bundle (which must stay under the Lambda unzipped-size cap); the
+// self-host build resolves the real runner.
+const questRunnerAlias = {
+  '@selfhost/quest-runner':
+    process.env.B4M_SELF_HOST === 'true'
+      ? './server/utils/selfhostQuestRunner.ts'
+      : './server/utils/selfhostQuestRunner.hosted.ts',
+};
+
 // NEXT_PUBLIC_CDN_URL is an absolute URL on deployed stages, but on personal
 // `sst dev` stages it is the relative local file-proxy base ('/api/app-files/serve'),
 // which is same-origin and needs no remote-image pattern. Only derive a hostname
@@ -35,7 +46,10 @@ const nextConfig = {
   // Self-host build only (open-core #9313): emit a standalone server bundle for
   // the Docker image. The normal SST/OpenNext build manages its own output, so
   // this is gated on B4M_SELF_HOST to leave staging/prod untouched.
-  ...(process.env.B4M_SELF_HOST === 'true' ? { output: 'standalone' } : {}),
+  // Also inline B4M_SELF_HOST into the client bundle so shared code (e.g. the
+  // settingsMap defaults in @bike4mind/common) can resolve self-host-aware
+  // defaults in the browser, not just on the server.
+  ...(process.env.B4M_SELF_HOST === 'true' ? { output: 'standalone', env: { B4M_SELF_HOST: 'true' } } : {}),
 
   // Disable production source maps to reduce bundle size by 20-30%
   // Can be enabled temporarily for debugging with ENABLE_SOURCE_MAPS=true
@@ -160,6 +174,7 @@ const nextConfig = {
     // Stub Node.js modules for browser builds (e.g., HiGHS WASM loader uses require('fs'))
     resolveAlias: {
       ...selfHostResolveAlias,
+      ...questRunnerAlias,
       canvas: { browser: './empty-module.js' },
       fs: { browser: './empty-module.js' },
       path: { browser: './empty-module.js' },

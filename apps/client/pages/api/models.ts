@@ -47,15 +47,20 @@ async function buildModelsResponse(userId: string, logger: Logger) {
     xai: coreKeys.xai || undefined,
   };
 
+  const isSelfHost = process.env.B4M_SELF_HOST === 'true';
+
   const backends = {
     [ModelBackend.OpenAI]: apiKeys.openai ? new OpenAIBackend(apiKeys.openai, logger) : null,
     [ModelBackend.Anthropic]: apiKeys.anthropic ? new AnthropicBackend(apiKeys.anthropic, logger) : null,
-    [ModelBackend.Bedrock]: /* TODO: feature flag */ new UndifferentiatedBedrockBackend(),
+    // Bedrock and AWS need real AWS credentials, which a self-host install does not have
+    // (its AWS_ACCESS_KEY_ID is the local MinIO credential); listing their models there
+    // would offer choices that can only fail at dispatch.
+    [ModelBackend.Bedrock]: isSelfHost ? null : new UndifferentiatedBedrockBackend(),
     [ModelBackend.Gemini]: apiKeys.gemini ? new GeminiBackend(apiKeys.gemini) : null,
     [ModelBackend.Ollama]: apiKeys.ollama ? new OllamaBackend(apiKeys.ollama) : null,
     [ModelBackend.BFL]: apiKeys.bfl ? new BFLBackend(apiKeys.bfl) : new BFLBackend('demo-key'), // Always create BFL backend for testing
     [ModelBackend.XAI]: apiKeys.xai ? new XAIBackend(apiKeys.xai, logger) : null,
-    [ModelBackend.AWS]: new AWSBackend(),
+    [ModelBackend.AWS]: isSelfHost ? null : new AWSBackend(),
   } as const;
 
   const backendPromises = Object.entries(backends).map(async ([backendName, backend]) => {

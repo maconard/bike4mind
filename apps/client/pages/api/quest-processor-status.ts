@@ -25,6 +25,11 @@ const handler = baseApi()
     })
   )
   .get(async (_req, res) => {
+    // Self-host processes quests in-process (no separate service): if this
+    // route is answering, the processor is up.
+    if (process.env.B4M_SELF_HOST === 'true') {
+      return res.status(200).json({ connected: true });
+    }
     const url = `${Resource.QuestProcessorService.url}/health`;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);

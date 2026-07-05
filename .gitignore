@@ -25,6 +25,7 @@ cdk.context.json
 
 .env
 .env.secrets
+.env.selfhost
 .direnv
 
 # Local-only docker compose override (per-developer mongo port/container)

@@ -33,14 +33,19 @@ export class MailService {
   transporter: Transporter<SMTPTransport.SentMessageInfo>;
 
   constructor() {
+    // Implicit TLS on 465; mandatory STARTTLS on the 587 submission port so a
+    // MITM cannot strip the upgrade. Other ports (e.g. a local Mailpit on
+    // 1025) negotiate STARTTLS opportunistically or stay plain.
+    const port = parseInt(Config.MAIL_PORT);
     this.transporter = nodemailer.createTransport({
-      port: parseInt(Config.MAIL_PORT),
+      port,
       host: Config.MAIL_HOST,
       auth: {
         user: Config.MAIL_USERNAME,
         pass: Config.MAIL_PASSWORD,
       },
-      secure: true,
+      secure: port === 465,
+      requireTLS: port === 587,
     });
 
     this.validateConfig();

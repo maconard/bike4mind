@@ -226,6 +226,10 @@ const handler = baseApi({ auth: false })
       });
     }
 
+    // Self-host bootstrap: a fresh install has no admin to issue invites or enable
+    // open registration, so the first account skips the invite gate and gets admin.
+    const isBootstrapUser = process.env.B4M_SELF_HOST === 'true' && (await userRepository.count({})) === 0;
+
     // Register + finalize (email-verified state, deferred free-credit grant) in one
     // service call. registerViaOTC grants credits BEFORE dropping the pending tag, so
     // a grant failure leaves a retry breadcrumb rather than losing credits.
@@ -267,6 +271,7 @@ const handler = baseApi({ auth: false })
             creditTransactions: creditTransactionRepository,
           },
           logger: req.logger,
+          skipInviteCheck: isBootstrapUser,
         }
       );
     } catch (err) {
@@ -292,6 +297,13 @@ const handler = baseApi({ auth: false })
       // login branch and self-heals. Log the real cause; surface only a generic message.
       req.logger.error('OTC inline registration failed', err);
       throw new InternalServerError('Registration failed. Please try again.', { pendingToken: reissuedToken });
+    }
+
+    // Promote the self-host bootstrap account so the instance has an admin from day one.
+    if (isBootstrapUser && newUser?.id) {
+      const promoted = await userRepository.update({ id: newUser.id, isAdmin: true });
+      if (promoted) newUser = promoted;
+      req.logger.info('Self-host bootstrap: first registered user promoted to admin', { userId: newUser.id });
     }
 
     // Analytics only - the account already exists, so a counter-write failure must not 500 a

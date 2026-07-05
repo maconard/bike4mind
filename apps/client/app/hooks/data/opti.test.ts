@@ -19,6 +19,14 @@ vi.mock('@client/app/hooks/data/entitlements', () => ({
   useEntitlements: (options?: { enabled?: boolean }) => mockUseEntitlements(options),
 }));
 
+// The hook hides every Opti surface when the build carries no /opti premium
+// route (open core without the overlay). These tests exercise the access
+// logic, so mock a build WITH the overlay; the no-overlay case has its own
+// suite below via vi.resetModules.
+vi.mock('@client/app/premium-generated/premiumRoutes.generated', () => ({
+  premiumRoutes: [{ path: '/opti', lazyImport: async () => ({ default: () => null }) }],
+}));
+
 import { useOptiAccess } from './opti';
 
 const setUser = (currentUser: Record<string, unknown> | null, isAdmin = false) => {
@@ -98,5 +106,21 @@ describe('useOptiAccess', () => {
     mockUseEntitlements.mockReturnValue({ data: undefined });
     const { result } = renderHook(() => useOptiAccess());
     expect(result.current).toBe(false);
+  });
+});
+
+// --- No-overlay builds (open core): the /opti route does not exist, so every
+// Opti surface hides for everyone, including admins, and the entitlement
+// fetch never fires.
+describe('useOptiAccess without the OptiHashi overlay', () => {
+  it('denies an admin and disables the entitlement fetch', async () => {
+    vi.resetModules();
+    vi.doMock('@client/app/premium-generated/premiumRoutes.generated', () => ({ premiumRoutes: [] }));
+    const { useOptiAccess: useOptiAccessNoOverlay } = await import('./opti');
+    setUser({ id: 'a1', tags: [] }, true);
+    mockUseEntitlements.mockReturnValue({ data: ['optihashi:pro'] });
+    const { result } = renderHook(() => useOptiAccessNoOverlay());
+    expect(result.current).toBe(false);
+    expect(mockUseEntitlements).toHaveBeenCalledWith({ enabled: false });
   });
 });

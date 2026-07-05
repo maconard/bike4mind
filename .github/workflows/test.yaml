@@ -97,6 +97,12 @@ jobs:
   publish:
     needs: [check-repository, test]
     if: ${{ needs.check-repository.outputs.should-run == 'true' }}
+    # Reusable-workflow permissions flow from the CALLER: the called comment job
+    # can only use what is granted here (repo default token is read-only).
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
     uses: ./.github/workflows/snapshot-publish.yaml
     secrets:
       NPM_TOKEN_PUBLISH: ${{ secrets.NPM_TOKEN_PUBLISH }}

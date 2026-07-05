@@ -27,6 +27,15 @@ const RETRY_BACKOFF_MS = 300;
  * validation) - retrying those just burns the budget.
  */
 export async function dispatchQuest(params: QuestStartBody, logger: Logger): Promise<void> {
+  // Self-host runs without the separate quest service: process in this container.
+  // The runner module is resolved via a build-time alias (next.config.mjs) so
+  // hosted builds bundle only a stub and stay under the Lambda size cap.
+  if (process.env.B4M_SELF_HOST === 'true') {
+    const { runQuestSelfHost } = await import('@selfhost/quest-runner');
+    runQuestSelfHost(params, logger);
+    return;
+  }
+
   const url = `${Resource.QuestProcessorService.url}/process`;
   const body = JSON.stringify(params);
   const deadline = Date.now() + DISPATCH_TIMEOUT_MS;

@@ -3,7 +3,12 @@ import { useNavigate } from '@tanstack/react-router';
 import { useAdminModal } from '@client/app/components/admin/AdminPage';
 import { useOptiNavigation } from './useOptiNavigation';
 import { useFileBrowser } from '@client/app/components/Files/Browser';
+import { premiumRoutes } from '@client/app/premium-generated/premiumRoutes.generated';
 import type { NavigationIntent } from '@bike4mind/common';
+
+// Builds without the OptiHashi overlay (open core) have no /opti route; an
+// Opti action intent must no-op there instead of navigating to a dead route.
+const optiRouteExists = premiumRoutes.some(route => route.path.startsWith('/opti'));
 
 /**
  * Hook that dispatches navigation based on a NavigationIntent's navigationType.
@@ -42,6 +47,7 @@ export function useNavigationExecutor() {
           }
           // Opti family action: dispatch via Zustand store, then navigate to /opti
           // Support composite targets: "scheduling.solvers" -> family + subTab
+          if (!optiRouteExists) break;
           const dotIdx = intent.target.indexOf('.');
           if (dotIdx !== -1) {
             requestFamily(intent.target.slice(0, dotIdx), intent.target.slice(dotIdx + 1));

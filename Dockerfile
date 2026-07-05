@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1
 #
-# Bike4Mind self-host image — open-core #9313 (Path B: run anywhere, no AWS).
+# Bike4Mind self-host image: run anywhere, no AWS account required.
 # Builds the Next.js app with B4M_SELF_HOST=true so `sst` is aliased to the
 # env-backed @bike4mind/resource shim and Next emits a standalone server.
-# Runs against the Docker Compose stack (Mongo + MinIO + ElasticMQ) — see
-# compose.yaml and .env.selfhost.example. No AWS account required.
+# Runs against the Docker Compose stack (Mongo + MinIO + ElasticMQ + Mailpit);
+# see compose.selfhost.yaml and .env.selfhost.example.
 
 ARG NODE_VERSION=24
 

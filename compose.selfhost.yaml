@@ -1,0 +1,137 @@
+# Bike4Mind self-host stack: run anywhere, no AWS account required.
+#
+# Quickstart (see SELF_HOST.md for the full guide):
+#   cp .env.selfhost.example .env.selfhost      # then fill in secrets
+#   docker compose -f compose.selfhost.yaml --env-file .env.selfhost up
+#
+# By default the app pulls the CI-published image (ghcr.io/<org>/bike4mind-selfhost).
+# To build locally instead: `docker compose -f compose.selfhost.yaml build`
+# (needs ~12-16GB Docker memory; the CI-published image is the supported path).
+#
+# The separate `compose.yaml` in this repo is the dev Mongo helper and is left
+# untouched; this file is the self-host stack.
+#
+# SECURITY — this stack is for LOCAL / single-host use. The backing services
+# (Mongo, MinIO, ElasticMQ, Mailpit) run without authentication and are bound
+# to 127.0.0.1 so they are NOT reachable off the host. Before running on a
+# public-facing server you MUST: enable Mongo auth (--auth + a user), set
+# strong MINIO_ROOT_USER/MINIO_ROOT_PASSWORD (do not ship the dev defaults),
+# point MAIL_* at a real SMTP provider, put the app behind a reverse proxy
+# with TLS, and keep the backing ports unpublished. Do not expose
+# 27017/9000/9324/8025 to the internet.
+#
+# KNOWN LIMITATION: the realtime websocket gateway is not in this stack yet,
+# so live streaming updates degrade (chat replies appear on refresh).
+
+name: bike4mind-selfhost
+
+services:
+  mongo:
+    image: mongo:7
+    command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
+    volumes:
+      - mongo-data:/data/db
+    # Bound to loopback — reachable by the app over the compose network, not off-host.
+    ports:
+      - '127.0.0.1:27017:27017'
+    # Single-node replica set (the app requires a replica set for transactions).
+    # The healthcheck initiates rs0 on first run, then reports healthy once up.
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'mongosh',
+          '--quiet',
+          '--eval',
+          "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok }",
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  # S3-compatible object storage. The app uses the AWS S3 SDK pointed at this endpoint.
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    # Credentials come from .env.selfhost (no literals in this file). The
+    # .env.selfhost.example ships the conventional local default (minioadmin);
+    # change it for anything but local eval.
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio-data:/data
+    # Loopback-only. Override MINIO_ROOT_USER/PASSWORD for anything but local eval.
+    ports:
+      - '127.0.0.1:9000:9000'
+      - '127.0.0.1:9001:9001'
+    healthcheck:
+      test: ['CMD-SHELL', 'curl -sf http://localhost:9000/minio/health/live || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # One-shot: create the buckets the app expects (names come from .env.selfhost).
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    env_file:
+      - .env.selfhost
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >
+        mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD" &&
+        for b in "$$APP_FILES_BUCKET" "$$EMAIL_INGESTION_BUCKET" "$$FAB_FILE_BUCKET" "$$GENERATED_IMAGES_BUCKET" "$$HISTORY_IMPORT_BUCKET" "$$PUBLISHED_ARTIFACTS_BUCKET" "$$SLACK_EXPORT_BUCKET"; do
+          [ -n "$$b" ] && mc mb -p "local/$$b" || true;
+        done
+
+  # SQS-compatible queue. Queues are predeclared in elasticmq.conf; the URL
+  # format there matches the *_QUEUE URLs in .env.selfhost.example.
+  sqs:
+    image: softwaremill/elasticmq-native
+    volumes:
+      - ./elasticmq.conf:/opt/elasticmq.conf:ro
+    # Loopback-only — ElasticMQ has no auth; never expose it off-host.
+    ports:
+      - '127.0.0.1:9324:9324'
+      - '127.0.0.1:9325:9325'
+
+  # Local mail catcher: all outgoing mail (including sign-in codes) lands here.
+  # Read it at http://localhost:8025. Point MAIL_* at a real SMTP provider instead
+  # for anything beyond local use.
+  mail:
+    image: axllent/mailpit
+    ports:
+      - '127.0.0.1:8025:8025'
+
+  app:
+    # Default: pull the CI-published multi-arch image (linux/amd64 + linux/arm64).
+    # Override with B4M_IMAGE, or run `docker compose -f compose.selfhost.yaml build`
+    # to build from source.
+    image: ${B4M_IMAGE:-ghcr.io/bike4mind/bike4mind-selfhost:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env.selfhost
+    depends_on:
+      mongo:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      sqs:
+        condition: service_started
+      mail:
+        condition: service_started
+    ports:
+      - '3000:3000'
+    # NOTE: the realtime websocket gateway is not in this stack yet. The app
+    # serves HTTP without it; live streaming updates degrade.
+
+volumes:
+  mongo-data:
+  minio-data:

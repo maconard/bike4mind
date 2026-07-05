@@ -207,7 +207,10 @@ const MultiStepLogin: React.FC<MultiStepLoginProps> = ({
       setCurrentStep('otc');
       startResendCooldown();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+      // useSendOTC rejects with a plain { message, code } object (not an Error instance),
+      // so read .message off either shape - otherwise real server messages like the OTC
+      // rate-limit's "try again in N seconds" collapse into "An unexpected error occurred".
+      const errorMessage = (error as { message?: string })?.message || 'An unexpected error occurred';
       toast.error(errorMessage);
     } finally {
       setIsCheckingStrategy(false);
@@ -222,7 +225,8 @@ const MultiStepLogin: React.FC<MultiStepLoginProps> = ({
       toast.success(t('auth.codeSent'));
       startResendCooldown();
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to resend code';
+      // Same plain-object rejection shape as handleEmailSubmit above.
+      const errorMessage = (error as { message?: string })?.message || 'Failed to resend code';
       toast.error(errorMessage);
     }
   };

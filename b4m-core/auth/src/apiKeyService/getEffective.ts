@@ -160,12 +160,17 @@ export const getEffectiveLLMApiKeys = async (
     return apiKey.apiKey;
   };
 
+  // Self-host: fall back to the provider keys from the environment
+  // (.env.selfhost) when no user or admin key is stored. Trimmed so a
+  // whitespace-only value stays "unset" instead of enabling the provider.
+  const envKey = (name: string) => (process.env.B4M_SELF_HOST === 'true' && process.env[name]?.trim()) || null;
+
   return {
-    openai: keyOrExpired(openaiUserKey) || openaiDemoKey || null,
-    anthropic: keyOrExpired(anthropicUserKey) || anthropicDemoKey || null,
-    gemini: keyOrExpired(geminiUserKey) || geminiDemoKey || null,
+    openai: keyOrExpired(openaiUserKey) || openaiDemoKey || envKey('OPENAI_API_KEY'),
+    anthropic: keyOrExpired(anthropicUserKey) || anthropicDemoKey || envKey('ANTHROPIC_API_KEY'),
+    gemini: keyOrExpired(geminiUserKey) || geminiDemoKey || envKey('GEMINI_API_KEY'),
     bfl: keyOrExpired(bflUserKey) || bflDemoKey || null,
-    xai: keyOrExpired(xaiUserKey) || xaiDemoKey || null,
+    xai: keyOrExpired(xaiUserKey) || xaiDemoKey || envKey('XAI_API_KEY'),
     voyageai: keyOrExpired(voyageaiUserKey) || voyageaiDemoKey || null,
     ollama: ollamaEnabled ? ollamaBackend || null : null,
   };

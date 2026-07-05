@@ -3,6 +3,33 @@ import { EventBridgeClient, PutEventsCommand } from '@aws-sdk/client-eventbridge
 import { Resource } from 'sst';
 import { QuestStartBodySchema } from '@bike4mind/services';
 import { ContextTelemetrySchema, ContextTelemetryAlertsSchema } from '@bike4mind/common';
+import { Logger } from '@bike4mind/observability';
+
+// Self-host has no EventBridge. Deliver email.send straight to the mailer and
+// drop everything else: those events feed async enrichment (summaries, tags,
+// analytics), and a dropped event must degrade the feature, not 500 the caller.
+async function publishSelfHost(eventName: string, detail: unknown): Promise<void> {
+  if (eventName === 'email.send') {
+    const { default: mailer } = await import('./mailer');
+    const { to, subject, body, attachments } = detail as {
+      to: string;
+      subject: string;
+      body: string;
+      attachments?: { filename: string; content: string; contentType: string }[];
+    };
+    await mailer.sendEmail(to, {
+      subject,
+      html: body,
+      attachments: attachments?.map(att => ({
+        filename: att.filename,
+        content: Buffer.from(att.content, 'base64'),
+        contentType: att.contentType,
+      })),
+    });
+    return;
+  }
+  new Logger({ metadata: { service: 'eventBus' } }).debug(`Self-host: dropping event ${eventName} (no event bus)`);
+}
 
 function createEventBuilder({
   getEventBusName,
@@ -16,6 +43,9 @@ function createEventBuilder({
   return function event<EventName extends string, Schema extends z.ZodType>(eventName: EventName, schema: Schema) {
     return {
       publish: (detail: z.infer<typeof schema>) => {
+        if (process.env.B4M_SELF_HOST === 'true') {
+          return publishSelfHost(eventName, detail);
+        }
         // Create client on each publish to ensure fresh AWS credentials
         // Lambda containers can stay warm for extended periods, causing module-level
         // clients to capture expired credentials. This was causing production failures:
