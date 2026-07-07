@@ -38,7 +38,7 @@ import { trackSignupConversion } from '@client/app/utils/signupConversion';
 import { applyRedirect, appendRedirectTo } from '@client/app/utils/authRedirect';
 import { resetRefreshPromise } from '@client/app/contexts/ApiContext';
 import { CURRENT_POLICY_VERSION } from '@bike4mind/common';
-import { ExternalLinks } from '@client/app/utils/externalLinks';
+import { ExternalLinks, CHECKBOX_LABEL_LINK_SX } from '@client/app/utils/externalLinks';
 
 const registerSchema = z.object({
   username: z
@@ -665,7 +665,7 @@ const Register: React.FC = () => {
                                   href={ExternalLinks.terms}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  onClick={e => e.stopPropagation()}
+                                  sx={CHECKBOX_LABEL_LINK_SX}
                                 >
                                   Terms of Service
                                 </Link>
@@ -674,7 +674,7 @@ const Register: React.FC = () => {
                                   href={ExternalLinks.acceptableUse}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  onClick={e => e.stopPropagation()}
+                                  sx={CHECKBOX_LABEL_LINK_SX}
                                 >
                                   Acceptable Use Policy
                                 </Link>
@@ -683,7 +683,7 @@ const Register: React.FC = () => {
                                   href={ExternalLinks.privacy}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  onClick={e => e.stopPropagation()}
+                                  sx={CHECKBOX_LABEL_LINK_SX}
                                 >
                                   Privacy Policy
                                 </Link>

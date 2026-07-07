@@ -37,7 +37,7 @@ import { gray, brand } from '@client/app/utils/themes/colors';
 import { visuallyHidden } from '@client/app/utils/a11yStyles';
 import { getWebsiteUrl, WEBSITE_URL } from '@client/config/general';
 import { CURRENT_POLICY_VERSION } from '@bike4mind/common';
-import { ExternalLinks } from '@client/app/utils/externalLinks';
+import { ExternalLinks, CHECKBOX_LABEL_LINK_SX } from '@client/app/utils/externalLinks';
 import { trackSignupConversion } from '@client/app/utils/signupConversion';
 
 /**
@@ -934,7 +934,7 @@ const MultiStepLogin: React.FC<MultiStepLoginProps> = ({
                           href={ExternalLinks.terms}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
+                          sx={CHECKBOX_LABEL_LINK_SX}
                         >
                           Terms of Service
                         </Link>
@@ -943,7 +943,7 @@ const MultiStepLogin: React.FC<MultiStepLoginProps> = ({
                           href={ExternalLinks.acceptableUse}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
+                          sx={CHECKBOX_LABEL_LINK_SX}
                         >
                           Acceptable Use Policy
                         </Link>
@@ -952,7 +952,7 @@ const MultiStepLogin: React.FC<MultiStepLoginProps> = ({
                           href={ExternalLinks.privacy}
                           target="_blank"
                           rel="noopener noreferrer"
-                          onClick={e => e.stopPropagation()}
+                          sx={CHECKBOX_LABEL_LINK_SX}
                         >
                           Privacy Policy
                         </Link>
